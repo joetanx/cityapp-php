@@ -1,17 +1,24 @@
 <!DOCTYPE html>
 <?php
+  # Check environment for database credentials
   $db_addr=getenv('DBADDR');
   $db_user=getenv('DBUSER');
   $db_pass=getenv('DBPASS');
+  
+  # Check environment for CCP connection details
   $ccp_fqdn=getenv('CCPFQDN');
   $appid=getenv('APPID');
   $query=getenv('QUERY');
+  
+  # If database address exists in environment
   if(!empty($db_addr))
   {
     $host=$db_addr;
     $user=$db_user;
     $pass=$db_pass;
   }
+  
+  # If secret file exists at /conjur/worlddb.json (Conjur secrets provider push-to-file)
   elseif(file_exists('/conjur/worlddb.json'))
   {
     $json_data = file_get_contents('/conjur/worlddb.json');
@@ -20,6 +27,16 @@
     $user = $response_data->dbuser;
     $pass = $response_data->dbpass;
   }
+  
+  # If secret file exists at /secrets (Kubernetes secrets volume mount)
+  elseif(file_exists('/secrets/address'))
+  {
+    $host = file_get_contents('/secrets/address');
+    $user = file_get_contents('/secrets/username');
+    $pass = file_get_contents('/secrets/password');
+  }
+  
+  # If CCP FQDN exists in environment
   elseif(!empty($ccp_fqdn))
   {
     $ccp_url='https://'.$ccp_fqdn.'/AIMWebService/api/Accounts?AppID='.$appid.'&'.$query;
@@ -36,6 +53,9 @@
     $user = $response_data->UserName;
     $pass = $response_data->Content;
   }
+  
+  # Failure message if no credentials are available
+  # (Exits the PHP block without executing the database connection block
   else
   {
     exit('<h1>No database credentials configured!</h1>');
@@ -50,6 +70,8 @@
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     PDO::ATTR_EMULATE_PREPARES => false,
   ];
+  
+  # Database connection block
   try
   {
     $pdo = new PDO($attr, $user, $pass, $opts);
